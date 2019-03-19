@@ -115,7 +115,7 @@ def main():
 
     # Data Loader
     train_loader = torch.utils.data.DataLoader(data_train,
-                                               batch_size=args.batch_size, shuffle=True,
+                                               batch_size=args.batch_size, shuffle=False, #True
                                                collate_fn=datasets.utils.collate_g,
                                                num_workers=args.prefetch, pin_memory=True)
     valid_loader = torch.utils.data.DataLoader(data_valid,
@@ -141,6 +141,7 @@ def main():
     criterion = nn.MSELoss()
 
     evaluation = lambda output, target: torch.mean(torch.abs(output - target) / torch.abs(target))
+    evaluation = lambda output, target: torch.mean(torch.abs(output - target))
 
     print('Logger')
     logger = Logger(args.logPath)
@@ -226,6 +227,7 @@ def train(train_loader, model, criterion, optimizer, epoch, evaluation, logger):
 
     end = time.time()
     for i, (g, h, e, target) in enumerate(train_loader):
+        #  print("input data, g.size=", g.size(), "h.size=", h.size(), "e.size=", e.size(), "target.size=", target.size())
 
         # Prepare input data
         if args.cuda:
@@ -242,8 +244,10 @@ def train(train_loader, model, criterion, optimizer, epoch, evaluation, logger):
         train_loss = criterion(output, target)
 
         # Logs
-        losses.update(train_loss.data[0], g.size(0))
-        error_ratio.update(evaluation(output, target).data[0], g.size(0))
+        #losses.update(train_loss.data[0], g.size(0))
+        losses.update(train_loss.item(), g.size(0))
+        #error_ratio.update(evaluation(output, target).data[0], g.size(0))
+        error_ratio.update(evaluation(output, target).item(), g.size(0))
 
         # compute gradient and do SGD step
         train_loss.backward()
@@ -262,7 +266,7 @@ def train(train_loader, model, criterion, optimizer, epoch, evaluation, logger):
                   'Error Ratio {err.val:.4f} ({err.avg:.4f})'
                   .format(epoch, i, len(train_loader), batch_time=batch_time,
                           data_time=data_time, loss=losses, err=error_ratio))
-                          
+
     logger.log_value('train_epoch_loss', losses.avg)
     logger.log_value('train_epoch_error_ratio', error_ratio.avg)
 
@@ -290,15 +294,17 @@ def validate(val_loader, model, criterion, evaluation, logger=None):
         output = model(g, h, e)
 
         # Logs
-        losses.update(criterion(output, target).data[0], g.size(0))
-        error_ratio.update(evaluation(output, target).data[0], g.size(0))
+        #losses.update(criterion(output, target).data[0], g.size(0))
+        losses.update(criterion(output, target).item(), g.size(0))
+        #error_ratio.update(evaluation(output, target).data[0], g.size(0))
+        error_ratio.update(evaluation(output, target).item(), g.size(0))
 
         # measure elapsed time
         batch_time.update(time.time() - end)
         end = time.time()
 
         if i % args.log_interval == 0 and i > 0:
-            
+
             print('Test: [{0}/{1}]\t'
                   'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
                   'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
@@ -315,6 +321,6 @@ def validate(val_loader, model, criterion, evaluation, logger=None):
 
     return error_ratio.avg
 
-    
+
 if __name__ == '__main__':
     main()
