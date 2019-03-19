@@ -1,4 +1,4 @@
-#!/usr/bin/python                                                                                                                                                                                               
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
 
 """
@@ -25,7 +25,7 @@ from torch.autograd.variable import Variable
 
 
 __author__ = "Pau Riba, Anjan Dutta"
-__email__ = "priba@cvc.uab.cat, adutta@cvc.uab.cat" 
+__email__ = "priba@cvc.uab.cat, adutta@cvc.uab.cat"
 
 
 class MessageFunction(nn.Module):
@@ -90,7 +90,7 @@ class MessageFunction(nn.Module):
         return self.m_size(size_h, size_e, args)
 
     # Definition of various state of the art message functions
-    
+
     # Duvenaud et al. (2015), Convolutional Networks for Learning Molecular Fingerprints
     def m_duvenaud(self, h_v, h_w, e_vw, args):
         m = torch.cat([h_w, e_vw], 2)
@@ -170,8 +170,15 @@ class MessageFunction(nn.Module):
         # Matrices for each edge
         edge_output = self.learn_modules[0](e_vw)
         edge_output = edge_output.view(-1, self.args['out'], self.args['in'])
+        #  print("h_w.size=", h_w.size())
+        #  print("h_v.size=", h_v.size())
+        #  print("e_vw.size=", e_vw.size())
+        #  print("edge_outut.size=", edge_output.size())
+        # h_w and h_v are of shape (bsz x n) x h
+        # edge_out is of shape (bsz x n x n) x h
 
-        h_w_rows = h_w[..., None].expand(h_w.size(0), h_v.size(1), h_w.size(1)).contiguous()
+        #h_w_rows = h_w[..., None].expand(h_w.size(0), h_v.size(1), h_w.size(1)).contiguous()
+        h_w_rows = h_w.unsqueeze(dim=-1).expand(h_w.size(0), h_w.size(1), h_v.size(1)).contiguous()
 
         h_w_rows = h_w_rows.view(-1, self.args['in'])
 
@@ -185,6 +192,7 @@ class MessageFunction(nn.Module):
         return self.args['out']
 
     def init_mpnn(self, params):
+        print("init mpnn with params", params)
         learn_args = []
         learn_modules = []
         args = {}
@@ -201,12 +209,12 @@ class MessageFunction(nn.Module):
     def m_mgc(self, h_v, h_w, e_vw, args):
         m = e_vw
         return m
-    
+
     # Laplacian based methods
     # Bruna et al. (2013)
     def m_bruna(self, h_v, h_w, e_vw, args):
         # TODO
-        m = [] 
+        m = []
         return m
 
     # Defferrard et al. (2016)

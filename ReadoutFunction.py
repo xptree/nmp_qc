@@ -1,4 +1,4 @@
-#!/usr/bin/python                                                                                                                                                                                               
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
 
 """
@@ -15,6 +15,7 @@ import datasets
 from MessageFunction import MessageFunction
 from UpdateFunction import UpdateFunction
 from models.nnet import NNet
+from models.set2set import Set2Set
 
 import time
 import torch
@@ -29,7 +30,7 @@ from torch.autograd.variable import Variable
 dtype = torch.FloatTensor
 
 __author__ = "Pau Riba, Anjan Dutta"
-__email__ = "priba@cvc.uab.cat, adutta@cvc.uab.cat" 
+__email__ = "priba@cvc.uab.cat, adutta@cvc.uab.cat"
 
 
 class ReadoutFunction(nn.Module):
@@ -54,7 +55,8 @@ class ReadoutFunction(nn.Module):
                     'duvenaud': self.r_duvenaud,
                     'ggnn':     self.r_ggnn,
                     'intnet':   self.r_intnet,
-                    'mpnn':     self.r_mpnn
+                    'mpnn':     self.r_mpnn,
+                    'mpnn_s2s': self.r_mpnn_s2s
                 }.get(self.r_definition, None)
 
         if self.r_function is None:
@@ -65,7 +67,8 @@ class ReadoutFunction(nn.Module):
             'duvenaud': self.init_duvenaud,
             'ggnn':     self.init_ggnn,
             'intnet':   self.init_intnet,
-            'mpnn':     self.init_mpnn
+            'mpnn':     self.init_mpnn,
+            'mpnn_s2s': self.init_mpnn_s2s
         }.get(self.r_definition, lambda x: (nn.ParameterList([]), nn.ModuleList([]), {}))
 
         self.learn_args, self.learn_modules, self.args = init_parameters(args)
@@ -159,13 +162,15 @@ class ReadoutFunction(nn.Module):
 
     def r_mpnn(self, h):
 
+        print("mpnn readout h[0].size=", h[0].size(), "h[-1].size=", h[-1].size())
         aux = Variable( torch.Tensor(h[0].size(0), self.args['out']).type_as(h[0].data).zero_() )
         # For each graph
         for i in range(h[0].size(0)):
             nn_res = nn.Sigmoid()(self.learn_modules[0](torch.cat([h[0][i,:,:], h[-1][i,:,:]], 1)))*self.learn_modules[1](h[-1][i,:,:])
 
             # Delete virtual nodes
-            nn_res = (torch.sum(h[0][i,:,:],1).expand_as(nn_res)>0).type_as(nn_res)* nn_res
+            #nn_res = (torch.sum(h[0][i,:,:],1).expand_as(nn_res)>0).type_as(nn_res)* nn_res
+            nn_res = (torch.sum(h[0][i,:,:],1).unsqueeze(dim=-1).expand_as(nn_res)>0).type_as(nn_res)* nn_res
 
             aux[i,:] = torch.sum(nn_res,0)
 
@@ -184,6 +189,28 @@ class ReadoutFunction(nn.Module):
 
         args['out'] = params['target']
 
+        return nn.ParameterList(learn_args), nn.ModuleList(learn_modules), args
+
+    def r_mpnn_s2s(self, h):
+        # see section 5.3 of google's mpnn paper
+        m = torch.cat([h[0], h[-1]], dim=-1) # bs x n x 2d
+        set2set, ffn = self.learn_modules
+
+        return ffn(set2set(m))
+
+    def init_mpnn_s2s(self, params):
+        learn_args = []
+        learn_modules = []
+        args = {}
+
+        # s2s
+        s2s = Set2Set(output_channel=params['in'], processing_step=params['set2set_comps'], num_layers=1)
+        learn_modules.append(s2s)
+
+        ffn = NNet(hlayers=(200, ))
+        learn_modules.append(ffn)
+
+        args['out'] = params['target']
         return nn.ParameterList(learn_args), nn.ModuleList(learn_modules), args
 
 if __name__ == '__main__':
