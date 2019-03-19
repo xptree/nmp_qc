@@ -39,7 +39,10 @@ class NNet(nn.Module):
     def __init__(self, n_in, n_out, hlayers=(128, 256, 128)):
         super(NNet, self).__init__()
         self.n_hlayers = len(hlayers)
-        self.fcs = nn.ModuleList([nn.Linear(n_in, hlayers[i]) if i == 0 else
+        if len(hlayers) == 0:
+            self.fcs = nn.ModuleList([nn.Linear(n_in, n_out), ])
+        else:
+            self.fcs = nn.ModuleList([nn.Linear(n_in, hlayers[i]) if i == 0 else
                                   nn.Linear(hlayers[i-1], n_out) if i == self.n_hlayers else
                                   nn.Linear(hlayers[i-1], hlayers[i]) for i in range(self.n_hlayers+1)])
 
