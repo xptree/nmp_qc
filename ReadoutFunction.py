@@ -45,8 +45,8 @@ class ReadoutFunction(nn.Module):
         self.__set_readout(readout_def, args)
 
     # Readout graph given node values at las layer
-    def forward(self, h_v):
-        return self.r_function(h_v)
+    def forward(self, h_v, node_mask):
+        return self.r_function(h_v, node_mask)
 
     # Set a readout function
     def __set_readout(self, readout_def, args):
@@ -81,7 +81,7 @@ class ReadoutFunction(nn.Module):
     ## Definition of various state of the art update functions
 
     # Duvenaud
-    def r_duvenaud(self, h):
+    def r_duvenaud(self, h, node_mask):
         # layers
         aux = []
         for l in range(len(h)):
@@ -116,7 +116,7 @@ class ReadoutFunction(nn.Module):
         return nn.ParameterList(learn_args), nn.ModuleList(learn_modules), args
 
     # GG-NN, Li et al.
-    def r_ggnn(self, h):
+    def r_ggnn(self, h, node_mask):
 
         aux = Variable( torch.Tensor(h[0].size(0), self.args['out']).type_as(h[0].data).zero_() )
         # For each graph
@@ -148,7 +148,7 @@ class ReadoutFunction(nn.Module):
 
 
     # Battaglia et al. (2016), Interaction Networks
-    def r_intnet(self, h):
+    def r_intnet(self, h, node_mask):
 
         aux = torch.sum(h[-1],1)
 
@@ -163,7 +163,7 @@ class ReadoutFunction(nn.Module):
 
         return nn.ParameterList(learn_args), nn.ModuleList(learn_modules), args
 
-    def r_mpnn(self, h):
+    def r_mpnn(self, h, node_mask):
 
         #print("mpnn readout h[0].size=", h[0].size(), "h[-1].size=", h[-1].size())
         aux = Variable( torch.Tensor(h[0].size(0), self.args['out']).type_as(h[0].data).zero_() )
@@ -190,37 +190,50 @@ class ReadoutFunction(nn.Module):
         learn_modules.append(
                 NNet(n_in=2*params['in'],
                     n_out=params['target'],
-                    hlayers=(200,)
+                    hlayers=(params['hidden_dim'],)
                     ))
 
         # j
         learn_modules.append(
                 NNet(n_in=params['in'],
                     n_out=params['target'],
-                    hlayers=(200,)
+                    hlayers=(params['hidden_dim'],)
                     ))
 
         args['out'] = params['target']
 
         return nn.ParameterList(learn_args), nn.ModuleList(learn_modules), args
 
-    def r_mpnn_s2s(self, h):
+    def r_mpnn_s2s(self, h, node_mask):
         # see section 5.3 of google's mpnn paper
         m = torch.cat([h[0], h[-1]], dim=-1) # bs x n x 2d
-        set2set, ffn = self.learn_modules
+        proj, set2set, ffn = self.learn_modules
 
-        return ffn(set2set(m))
+        m = proj(m)
+
+        return ffn(set2set(m, node_mask))
 
     def init_mpnn_s2s(self, params):
         learn_args = []
         learn_modules = []
         args = {}
 
+
+        proj = nn.Linear(in_features=params['in'] * 2,
+                out_features=params['in'] * 2)
+
+        learn_modules.append(proj)
         # s2s
-        s2s = Set2Set(output_channel=params['in'], processing_step=params['set2set_comps'], num_layers=1)
+        s2s = Set2Set(
+                out_channels=params['in'] * 2,
+                processing_steps=params['set2set_comps'],
+                num_layers=1)
         learn_modules.append(s2s)
 
-        ffn = NNet(hlayers=(200, ))
+        ffn = NNet(n_in=params['in']*4,
+                    n_out=params['target'],
+                    hlayers=(params['hidden_dim'], )
+                )
         learn_modules.append(ffn)
 
         args['out'] = params['target']

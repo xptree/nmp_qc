@@ -8,6 +8,7 @@ from ReadoutFunction import ReadoutFunction
 import torch
 import torch.nn as nn
 from torch.autograd import Variable
+import time
 
 __author__ = "Pau Riba, Anjan Dutta"
 __email__ = "priba@cvc.uab.cat, adutta@cvc.uab.cat"
@@ -35,12 +36,31 @@ class MPNN(nn.Module):
             Classification | [Regression (default)]. If classification, LogSoftmax layer is applied to the output vector.
     """
 
-    def __init__(self, in_n, hidden_state_size, message_size, n_layers, l_target, type='regression'):
+    def __init__(self, in_n,
+            hidden_state_size,
+            message_size,
+            n_layers,
+            l_target,
+            type='regression',
+            readout='s2s',
+            edge_hidden_dim=50,
+            set2set_comps=12,
+            hidden_dim=200
+            ):
+
         super(MPNN, self).__init__()
 
         # Define message
-        self.m = nn.ModuleList(
-            [MessageFunction('mpnn', args={'edge_feat': in_n[1], 'in': hidden_state_size, 'out': message_size})])
+        self.m = nn.ModuleList([
+            MessageFunction('mpnn',
+                args={'edge_feat': in_n[1],
+                    'in': hidden_state_size,
+                    'out': message_size,
+                    'edge_num_layers': n_layers,
+                    'edge_hidden_dim': edge_hidden_dim,
+                    }
+                )
+            ])
 
         # Define Update
         self.u = nn.ModuleList([UpdateFunction('mpnn',
@@ -48,9 +68,12 @@ class MPNN(nn.Module):
                                                      'out': hidden_state_size})])
 
         # Define Readout
-        self.r = ReadoutFunction('mpnn',
+        self.r = ReadoutFunction('mpnn_s2s' if readout == 's2s' else 'mpnn',
                                  args={'in': hidden_state_size,
-                                       'target': l_target})
+                                       'target': l_target,
+                                       'set2set_comps': set2set_comps,
+                                       'hidden_dim': hidden_dim
+                                       })
 
         self.type = type
 
@@ -61,6 +84,9 @@ class MPNN(nn.Module):
 
     def forward(self, g, h_in, e):
 
+        # h_in is of size bsz x n x node_feat
+        node_mask = torch.sum(h_in, dim=-1) == 0.0 # bsz x n
+
         h = []
 
         # Padding to some larger dimension d
@@ -69,13 +95,17 @@ class MPNN(nn.Module):
 
         h.append(h_t.clone())
 
+        #  m_time, u_time, r_time = 0, 0, 0
         # Layer
         for t in range(0, self.n_layers):
             e_aux = e.view(-1, e.size(3))
 
             h_aux = h[t].view(-1, h[t].size(2))
 
+            #  start = time.time()
             m = self.m[0].forward(h[t], h_aux, e_aux)
+            #  m_time += time.time() - start
+
             m = m.view(h[0].size(0), h[0].size(1), -1, m.size(1))
 
             # Nodes without edge set message to 0
@@ -83,7 +113,9 @@ class MPNN(nn.Module):
 
             m = torch.squeeze(torch.sum(m, 1))
 
+            #  start = time.time()
             h_t = self.u[0].forward(h[t], m)
+            #  u_time += time.time() - start
 
             # Delete virtual nodes
             #h_t = (torch.sum(h_in, 2).expand_as(h_t) > 0).type_as(h_t) * h_t
@@ -91,8 +123,11 @@ class MPNN(nn.Module):
             h.append(h_t)
 
         # Readout
-        res = self.r.forward(h)
+        #  start = time.time()
+        res = self.r.forward(h, node_mask)
+        #  r_time += time.time() - start
 
         if self.type == 'classification':
             res = nn.LogSoftmax()(res)
+        #  print("m_time=%f u_time=%f r_time=%f" % (m_time, u_time, r_time))
         return res

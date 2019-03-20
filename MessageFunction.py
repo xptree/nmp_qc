@@ -205,7 +205,7 @@ class MessageFunction(nn.Module):
                 NNet(
                     n_in=params['edge_feat'],
                     n_out=(params['in']*params['out']),
-                    hlayers=(50, 50, 50, 50)
+                    hlayers=(params['edge_hidden_dim'],) * params['edge_num_layers']
                     )
                 )
 

@@ -47,7 +47,7 @@ class NNet(nn.Module):
                                   nn.Linear(hlayers[i-1], hlayers[i]) for i in range(self.n_hlayers+1)])
 
     def forward(self, x):
-        x = x.contiguous().view(-1, self.num_flat_features(x))
+        #x = x.contiguous().view(-1, self.num_flat_features(x))
         for i in range(self.n_hlayers):
             x = F.relu(self.fcs[i](x))
         x = self.fcs[-1](x)

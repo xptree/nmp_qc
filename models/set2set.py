@@ -46,9 +46,10 @@ class Set2Set(torch.nn.Module):
     def reset_parameters(self):
         self.lstm.reset_parameters()
 
-    def forward(self, x):
+    def forward(self, x, mask):
         batch_size = x.size(0)
-		# x is of shape (bsz x n x in_channels)
+		# x is of shape (bsz x n x out_channels)
+        # mask is of shape (bsz x n)
 
         h = (x.new_zeros((self.num_layers, batch_size, self.out_channels)),
              x.new_zeros((self.num_layers, batch_size, self.out_channels)))
@@ -58,11 +59,12 @@ class Set2Set(torch.nn.Module):
             q, h = self.lstm(q_star.unsqueeze(0), h) # 1 x bsz x out_channel
             q = q.squeeze(0) # bsz x out_channel
             e = torch.bmm(x, q.unsqueeze(-1)).squeeze(-1) # bsz x n
+            e.masked_fill_(mask, float('-inf')) # bsz x n
             a = F.softmax(e, dim=1).unsqueeze(1) # bsz x 1 x n
             r = torch.bmm(a, x).squeeze(1) # bsz x out_channel
-            q_star = torch.cat([q, r], dim=-1)
+            q_star = torch.cat([q, r], dim=-1) # bsz x in_channel
 
-        return q_star
+        return q_star # bs x (2*out_channel)
 
     def __repr__(self):
         return '{}({}, {})'.format(self.__class__.__name__, self.in_channels,
