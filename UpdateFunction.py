@@ -1,9 +1,9 @@
-#!/usr/bin/python                                                                                                                                                                                               
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
 
 """
     UpdateFunction.py: Updates the nodes using the previous state and the message.
-    
+
     Usage:
 
 """
@@ -29,7 +29,7 @@ from torch.autograd.variable import Variable
 dtype = torch.FloatTensor
 
 __author__ = "Pau Riba, Anjan Dutta"
-__email__ = "priba@cvc.uab.cat, adutta@cvc.uab.cat" 
+__email__ = "priba@cvc.uab.cat, adutta@cvc.uab.cat"
 
 
 class UpdateFunction(nn.Module):
@@ -87,7 +87,8 @@ class UpdateFunction(nn.Module):
 
         aux = torch.bmm(parameter_mat, torch.transpose(m_v, 1, 2))
 
-        return torch.transpose(torch.nn.Sigmoid()(aux), 1, 2)
+        #return torch.transpose(torch.nn.Sigmoid()(aux), 1, 2)
+        return torch.transpose(F.sigmoid()(aux), 1, 2)
 
     def init_duvenaud(self, params):
         learn_args = []

@@ -20,6 +20,7 @@ from models.set2set import Set2Set
 import time
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import os
 import argparse
 import numpy as np
@@ -92,7 +93,8 @@ class ReadoutFunction(nn.Module):
 
             for j in range(0, aux[l].size(1)):
                 # Mask whole 0 vectors
-                aux[l][:, j, :] = nn.Softmax()(aux[l][:, j, :].clone())*(torch.sum(aux[l][:, j, :] != 0, 1) > 0).expand_as(aux[l][:, j, :]).type_as(aux[l])
+                #aux[l][:, j, :] = nn.Softmax()(aux[l][:, j, :].clone())*(torch.sum(aux[l][:, j, :] != 0, 1) > 0).expand_as(aux[l][:, j, :]).type_as(aux[l])
+                aux[l][:, j, :] = F.softmax(aux[l][:, j, :].clone())*(torch.sum(aux[l][:, j, :] != 0, 1) > 0).expand_as(aux[l][:, j, :]).type_as(aux[l])
 
         aux = torch.sum(torch.sum(torch.stack(aux, 3), 3), 1)
         return self.learn_modules[0](torch.squeeze(aux))
@@ -119,7 +121,8 @@ class ReadoutFunction(nn.Module):
         aux = Variable( torch.Tensor(h[0].size(0), self.args['out']).type_as(h[0].data).zero_() )
         # For each graph
         for i in range(h[0].size(0)):
-            nn_res = nn.Sigmoid()(self.learn_modules[0](torch.cat([h[0][i,:,:], h[-1][i,:,:]], 1)))*self.learn_modules[1](h[-1][i,:,:])
+            #nn_res = nn.Sigmoid()(self.learn_modules[0](torch.cat([h[0][i,:,:], h[-1][i,:,:]], 1)))*self.learn_modules[1](h[-1][i,:,:])
+            nn_res = F.sigmoid(self.learn_modules[0](torch.cat([h[0][i,:,:], h[-1][i,:,:]], 1)))*self.learn_modules[1](h[-1][i,:,:])
 
             # Delete virtual nodes
             nn_res = (torch.sum(h[0][i,:,:],1).expand_as(nn_res)>0).type_as(nn_res)* nn_res
@@ -166,7 +169,8 @@ class ReadoutFunction(nn.Module):
         aux = Variable( torch.Tensor(h[0].size(0), self.args['out']).type_as(h[0].data).zero_() )
         # For each graph
         for i in range(h[0].size(0)):
-            nn_res = nn.Sigmoid()(self.learn_modules[0](torch.cat([h[0][i,:,:], h[-1][i,:,:]], 1)))*self.learn_modules[1](h[-1][i,:,:])
+            #nn_res = nn.Sigmoid()(self.learn_modules[0](torch.cat([h[0][i,:,:], h[-1][i,:,:]], 1)))*self.learn_modules[1](h[-1][i,:,:])
+            nn_res = F.sigmoid(self.learn_modules[0](torch.cat([h[0][i,:,:], h[-1][i,:,:]], 1)))*self.learn_modules[1](h[-1][i,:,:])
 
             # Delete virtual nodes
             #nn_res = (torch.sum(h[0][i,:,:],1).expand_as(nn_res)>0).type_as(nn_res)* nn_res
