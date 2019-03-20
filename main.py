@@ -38,18 +38,25 @@ def restricted_float(x, inter):
         raise argparse.ArgumentTypeError("%r not in range [1e-5, 1e-4]"%(x,))
     return x
 
+label_names = ['mu', 'alpha', 'homo', 'lumo', 'gap', 'r2',
+                'zpve', 'U0', 'U', 'H', 'G', 'Cv']
 # Argument parser
 parser = argparse.ArgumentParser(description='Neural message passing')
 
+parser.add_argument('--labels', '-l', type=str,
+                    choices=label_names + ['all'], default='all',
+                    help='target label for regression; all means '
+                    'predicting all properties at once')
 parser.add_argument('--dataset', default='qm9', help='QM9')
 parser.add_argument('--datasetPath', default='./data/qm9/dsgdb9nsd/', help='dataset path')
 parser.add_argument('--logPath', default='./log/qm9/mpnn/', help='log path')
 parser.add_argument('--plotLr', default=False, help='allow plotting the data')
 parser.add_argument('--plotPath', default='./plot/qm9/mpnn/', help='plot path')
 parser.add_argument('--resume', default='./checkpoint/qm9/mpnn/',
+#parser.add_argument('--resume', type=str, default="",
                     help='path to latest checkpoint')
 # Optimization Options
-parser.add_argument('--batch-size', type=int, default=100, metavar='N',
+parser.add_argument('--batch-size', type=int, default=20, metavar='N',
                     help='Input batch size for training (default: 20)')
 parser.add_argument('--no-cuda', action='store_true', default=False,
                     help='Enables CUDA training')
@@ -93,9 +100,18 @@ def main():
     test_ids = [files[i] for i in idx[10000:20000]]
     train_ids = [files[i] for i in idx[20000:]]
 
-    data_train = datasets.Qm9(root, train_ids, edge_transform=utils.qm9_edges, e_representation='raw_distance')
-    data_valid = datasets.Qm9(root, valid_ids, edge_transform=utils.qm9_edges, e_representation='raw_distance')
-    data_test = datasets.Qm9(root, test_ids, edge_transform=utils.qm9_edges, e_representation='raw_distance')
+    if args.labels == 'all':
+        args.labels = label_names
+
+    data_train = datasets.Qm9(root, train_ids,
+            edge_transform=utils.qm9_edges, e_representation='raw_distance',
+            labels=args.labels)
+    data_valid = datasets.Qm9(root, valid_ids,
+            edge_transform=utils.qm9_edges, e_representation='raw_distance',
+            labels=args.labels)
+    data_test = datasets.Qm9(root, test_ids,
+            edge_transform=utils.qm9_edges, e_representation='raw_distance',
+            labels=args.labels)
 
     # Define model and optimizer
     print('Define model')
@@ -104,7 +120,9 @@ def main():
     g, h_t, e = g_tuple
 
     print('\tStatistics')
-    stat_dict = datasets.utils.get_graph_stats(data_valid, ['target_mean', 'target_std'])
+    #stat_dict = datasets.utils.get_graph_stats(data_valid, ['target_mean', 'target_std'])
+    stat_dict = datasets.utils.get_graph_stats(data_train, ['target_mean', 'target_std'])
+    print(stat_dict)
 
     data_train.set_target_transform(lambda x: datasets.utils.normalize_data(x,stat_dict['target_mean'],
                                                                             stat_dict['target_std']))
@@ -128,9 +146,14 @@ def main():
     print('\tCreate model')
     in_n = [len(h_t[0]), len(list(e.values())[0])]
     hidden_state_size = 73
+    hidden_state_size = 128
     message_size = 73
+    message_size = 128
     n_layers = 3
+    #n_layers = 6
     l_target = len(l)
+    print("in_n=%d, %d, hidden_state_size=%d, message_size=%d, n_layers=%d, l_target=%d" %\
+            (in_n[0], in_n[1], hidden_state_size, message_size, n_layers, l_target))
     type ='regression'
     model = MPNN(in_n, hidden_state_size, message_size, n_layers, l_target, type=type)
     del in_n, hidden_state_size, message_size, n_layers, l_target, type
@@ -140,7 +163,7 @@ def main():
 
     criterion = nn.MSELoss()
 
-    evaluation = lambda output, target: torch.mean(torch.abs(output - target) / torch.abs(target))
+    #evaluation = lambda output, target: torch.mean(torch.abs(output - target) / torch.abs(target))
     evaluation = lambda output, target: torch.mean(torch.abs(output - target))
 
     print('Logger')
@@ -149,7 +172,7 @@ def main():
     lr_step = (args.lr-args.lr*args.lr_decay)/(args.epochs*args.schedule[1] - args.epochs*args.schedule[0])
 
     # get the best checkpoint if available without training
-    if args.resume:
+    if len(args.resume):
         checkpoint_dir = args.resume
         best_model_file = os.path.join(checkpoint_dir, 'model_best.pth')
         if not os.path.isdir(checkpoint_dir):

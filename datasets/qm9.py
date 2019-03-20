@@ -29,20 +29,30 @@ from GraphReader.graph_reader import xyz_graph_reader
 __author__ = "Pau Riba, Anjan Dutta"
 __email__ = "priba@cvc.uab.cat, adutta@cvc.uab.cat"
 
+_label_names = ['mu', 'alpha', 'homo', 'lumo', 'gap', 'r2',
+                'zpve', 'U0', 'U', 'H', 'G', 'Cv']
+
 class Qm9(data.Dataset):
 
     # Constructor
     def __init__(self, root_path, ids, vertex_transform=utils.qm9_nodes, edge_transform=utils.qm9_edges,
-                 target_transform=None, e_representation='raw_distance'):
+                 target_transform=None, e_representation='raw_distance', labels=None):
         self.root = root_path
         self.ids = ids
         self.vertex_transform = vertex_transform
         self.edge_transform = edge_transform
         self.target_transform = target_transform
         self.e_representation = e_representation
+        labels = labels or _label_names
+
+        if isinstance(labels, str):
+            labels = [labels, ]
+
+        self.labels_id = np.array([_label_names.index(x) for x in labels])
 
     def __getitem__(self, index):
-        g, target = xyz_graph_reader(os.path.join(self.root, self.ids[index]))
+        g, target = xyz_graph_reader(os.path.join(self.root, self.ids[index]),
+                labels_id=self.labels_id)
         if self.vertex_transform is not None:
             h = self.vertex_transform(g)
 
@@ -86,7 +96,7 @@ if __name__ == '__main__':
     print(len(data_train))
     print(len(data_valid))
     print(len(data_test))
-    
+
     print(data_train[1])
     print(data_valid[1])
     print(data_test[1])
