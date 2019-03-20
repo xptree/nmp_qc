@@ -165,7 +165,7 @@ class ReadoutFunction(nn.Module):
 
     def r_mpnn(self, h):
 
-        print("mpnn readout h[0].size=", h[0].size(), "h[-1].size=", h[-1].size())
+        #print("mpnn readout h[0].size=", h[0].size(), "h[-1].size=", h[-1].size())
         aux = Variable( torch.Tensor(h[0].size(0), self.args['out']).type_as(h[0].data).zero_() )
         # For each graph
         for i in range(h[0].size(0)):
@@ -181,15 +181,24 @@ class ReadoutFunction(nn.Module):
         return aux
 
     def init_mpnn(self, params):
+        print("init mpnn read function with params", params)
         learn_args = []
         learn_modules = []
         args = {}
 
         # i
-        learn_modules.append(NNet(n_in=2*params['in'], n_out=params['target']))
+        learn_modules.append(
+                NNet(n_in=2*params['in'],
+                    n_out=params['target'],
+                    hlayers=(200,)
+                    ))
 
         # j
-        learn_modules.append(NNet(n_in=params['in'], n_out=params['target']))
+        learn_modules.append(
+                NNet(n_in=params['in'],
+                    n_out=params['target'],
+                    hlayers=(200,)
+                    ))
 
         args['out'] = params['target']
 
