@@ -88,7 +88,7 @@ class UpdateFunction(nn.Module):
         aux = torch.bmm(parameter_mat, torch.transpose(m_v, 1, 2))
 
         #return torch.transpose(torch.nn.Sigmoid()(aux), 1, 2)
-        return torch.transpose(F.sigmoid()(aux), 1, 2)
+        return torch.transpose(torch.sigmoid()(aux), 1, 2)
 
     def init_duvenaud(self, params):
         learn_args = []
