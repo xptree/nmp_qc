@@ -86,7 +86,7 @@ parser.add_argument('--edge-num-layers', type=int, default=4, help="layers for e
 parser.add_argument('--edge-hidden-dim', type=int, default=50, help="hidden dimension for edge network")
 parser.add_argument('--set2set-comps', type=int, default=12, help="M in icml paper")
 
-best_er1 = 0
+best_er1 = 100000.
 
 
 def main():
@@ -143,7 +143,7 @@ def main():
 
     # Data Loader
     train_loader = torch.utils.data.DataLoader(data_train,
-                                               batch_size=args.batch_size, shuffle=False, #True
+                                               batch_size=args.batch_size, shuffle=True,
                                                collate_fn=datasets.utils.collate_g,
                                                num_workers=args.prefetch, pin_memory=True)
     valid_loader = torch.utils.data.DataLoader(data_valid,
@@ -228,7 +228,7 @@ def main():
         # evaluate on test set
         er1 = validate(valid_loader, model, criterion, evaluation, logger)
 
-        is_best = er1 > best_er1
+        is_best = er1 <  best_er1
         best_er1 = min(er1, best_er1)
         utils.save_checkpoint({'epoch': epoch + 1, 'state_dict': model.state_dict(), 'best_er1': best_er1,
                                'optimizer': optimizer.state_dict(), }, is_best=is_best, directory=args.resume)
@@ -294,7 +294,7 @@ def train(train_loader, model, criterion, optimizer, epoch, evaluation, logger):
 
         # compute gradient and do SGD step
         train_loss.backward()
-        torch.nn.utils.clip_grad_norm(model.parameters(), args.max_grad_norm)
+        torch.nn.utils.clip_grad_norm_(model.parameters(), args.max_grad_norm)
         optimizer.step()
 
         # Measure elapsed time
