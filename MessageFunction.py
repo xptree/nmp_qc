@@ -192,7 +192,7 @@ class MessageFunction(nn.Module):
         return self.args['out']
 
     def init_mpnn(self, params):
-        print("init mpnn with params", params)
+        print("init mpnn message function with params", params)
         learn_args = []
         learn_modules = []
         args = {}
@@ -201,7 +201,13 @@ class MessageFunction(nn.Module):
         args['out'] = params['out']
 
         # Define a parameter matrix A for each edge label.
-        learn_modules.append(NNet(n_in=params['edge_feat'], n_out=(params['in']*params['out'])))
+        learn_modules.append(
+                NNet(
+                    n_in=params['edge_feat'],
+                    n_out=(params['in']*params['out']),
+                    hlayers=(50, 50, 50, 50)
+                    )
+                )
 
         return nn.ParameterList(learn_args), nn.ModuleList(learn_modules), args
 
