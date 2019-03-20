@@ -153,6 +153,7 @@ class UpdateFunction(nn.Module):
         return torch.squeeze(h_new).view(h_v.size())
 
     def init_mpnn(self, params):
+        print("init mpnn update function with params", params)
         learn_args = []
         learn_modules = []
         args = {}
