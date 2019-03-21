@@ -238,6 +238,7 @@ def main():
         utils.save_checkpoint({'epoch': epoch + 1, 'state_dict': model.state_dict(), 'best_er1': best_er1,
                                'optimizer': optimizer.state_dict(), }, is_best=is_best, directory=args.resume)
 
+        validate(test_loader, model, criterion, evaluation)
         # Logger step
         logger.log_value('learning_rate', args.lr).step()
 
