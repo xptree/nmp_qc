@@ -13,8 +13,8 @@ def error_ratio(pred, target):
     if type(pred) is not np.ndarray:
         pred = np.array(pred)
     if type(target) is not np.ndarray:
-        target = np.array(target)       
-        
+        target = np.array(target)
+
     return np.mean(np.divide(np.abs(pred - target), np.abs(target)))
 
 
@@ -24,10 +24,10 @@ class AverageMeter(object):
         self.reset()
 
     def reset(self):
-        self.val = 0
-        self.avg = 0
-        self.sum = 0
-        self.count = 0
+        self.val = 0.
+        self.avg = 0.
+        self.sum = 0.
+        self.count = 0.
 
     def update(self, val, n=1):
         self.val = val
@@ -41,7 +41,7 @@ class Logger(object):
         if not os.path.isdir(log_dir):
             # if the directory does not exist we create the directory
             os.makedirs(log_dir)
-        else:                      
+        else:
             # clean previous logged data under the same directory name
             self._remove(log_dir)
 
