@@ -85,7 +85,7 @@ parser.add_argument('--hidden-dim', type=int, default=200, help="hidden dimensio
 parser.add_argument('--edge-num-layers', type=int, default=4, help="layers for edge network")
 parser.add_argument('--edge-hidden-dim', type=int, default=50, help="hidden dimension for edge network")
 parser.add_argument('--set2set-comps', type=int, default=12, help="M in icml paper")
-
+parser.add_argument('--seed', type=int, default=42, help='Random seed.')
 best_er1 = 100000.
 
 
@@ -96,6 +96,11 @@ def main():
 
     # Check if CUDA is enabled
     args.cuda = not args.no_cuda and torch.cuda.is_available()
+
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
+    if args.cuda:
+        torch.cuda.manual_seed(args.seed)
 
     # Load data
     root = args.datasetPath
