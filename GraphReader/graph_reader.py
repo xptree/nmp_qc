@@ -16,6 +16,7 @@ from rdkit import Chem
 from rdkit.Chem import ChemicalFeatures
 from rdkit import RDConfig
 
+import rapidjson
 import os
 
 from os import listdir
@@ -418,6 +419,34 @@ def init_graph(prop, labels_id):
     return nx.Graph(tag=g_tag, index=g_index, A=g_A, B=g_B, C=g_C, mu=g_mu, alpha=g_alpha, homo=g_homo,
                     lumo=g_lumo, gap=g_gap, r2=g_r2, zpve=g_zpve, U0=g_U0, U=g_U, H=g_H, G=g_G, Cv=g_Cv), labels
 
+# Initialization of graph for AIChemy
+def aichemy_init_graph(prop, labels_id):
+
+    g_A = prop['rot_const'][0]
+    g_B = prop['rot_const'][1]
+    g_C = prop['rot_const'][2]
+    g_mu = np.linalg.norm(prop['dipole'])
+    g_alpha = np.trace(prop['polarizability'])
+    g_homo = prop['HOMO']
+    g_lumo = prop['LUMO']
+    g_gap = prop['LUMO'] - prop['HOMO']
+    g_r2 = prop['r2']
+    g_zpve = prop['ZPVE']
+    g_U0 = prop['U0']
+    g_U = prop['U']
+    g_H = prop['H']
+    g_G = prop['G']
+    g_Cv = prop['Cv']
+    # Omega is missing from QM9
+
+    labels = [g_mu, g_alpha, g_homo, g_lumo, g_gap, g_r2, g_zpve, g_U0, g_U, g_H, g_G, g_Cv]
+
+    if labels_id is not None:
+        labels = np.array(labels)[labels_id].tolist()
+
+    return nx.Graph(A=g_A, B=g_B, C=g_C, mu=g_mu, alpha=g_alpha, homo=g_homo,
+                    lumo=g_lumo, gap=g_gap, r2=g_r2, zpve=g_zpve, U0=g_U0, U=g_U, H=g_H, G=g_G, Cv=g_Cv), labels
+
 
 # XYZ file reader for QM9 dataset
 def xyz_graph_reader(graph_file, labels_id=None):
@@ -486,8 +515,70 @@ def xyz_graph_reader(graph_file, labels_id=None):
                                distance=np.linalg.norm(g.node[i]['coord'] - g.node[j]['coord']))
     return g , l
 
+
+
+
+# AIChemy file reader for QM9 dataset
+def aichemy_graph_reader(graph_file, labels_id=None):
+
+    with open(graph_file, "r") as f:
+        data = rapidjson.load(f)
+
+    g, l = aichemy_init_graph(data['properties'], labels_id)
+
+    atom_properties = data['dft']['grad_geomeTRIC']['geom']
+    pc = data['properties']['mulliken_charge']
+    smiles = data['smi']
+    m = Chem.MolFromSmiles(smiles)
+    m = Chem.AddHs(m)
+
+    fdef_name = os.path.join(RDConfig.RDDataDir, 'BaseFeatures.fdef')
+    factory = ChemicalFeatures.BuildFeatureFactory(fdef_name)
+    feats = factory.GetFeaturesForMol(m)
+
+    # Create nodes
+    for i in range(0, m.GetNumAtoms()):
+        atom_i = m.GetAtomWithIdx(i)
+
+        g.add_node(i, a_type=atom_i.GetSymbol(),
+                a_num=atom_i.GetAtomicNum(),
+                acceptor=0,
+                donor=0,
+                aromatic=atom_i.GetIsAromatic(),
+                hybridization=atom_i.GetHybridization(),
+                num_h=atom_i.GetTotalNumHs(),
+                coord=np.array(atom_properties[i]).astype(np.float),
+                pc=float(pc[i]))
+
+    for i in range(0, len(feats)):
+        if feats[i].GetFamily() == 'Donor':
+            node_list = feats[i].GetAtomIds()
+            for i in node_list:
+                g.node[i]['donor'] = 1
+        elif feats[i].GetFamily() == 'Acceptor':
+            node_list = feats[i].GetAtomIds()
+            for i in node_list:
+                g.node[i]['acceptor'] = 1
+
+    # Read Edges
+    for i in range(0, m.GetNumAtoms()):
+        for j in range(0, m.GetNumAtoms()):
+            e_ij = m.GetBondBetweenAtoms(i, j)
+            if e_ij is not None:
+                g.add_edge(i, j, b_type=e_ij.GetBondType(),
+                            distance=np.linalg.norm(g.node[i]['coord']-g.node[j]['coord']))
+            else:
+                # Unbonded
+                g.add_edge(i, j, b_type=None,
+                            distance=np.linalg.norm(g.node[i]['coord'] - g.node[j]['coord']))
+    return g , l
+
 if __name__ == '__main__':
 
+    g, l = aichemy_graph_reader("10.json")
+    print(g.nodes())
+    print(l)
+    exit(0)
     g1 = create_graph_grec('/home/adutta/Workspace/Datasets/Graphs/GREC/data/image1_1.gxl')
 
     g2 = create_graph_letter('/home/adutta/Workspace/Datasets/STDGraphs/Letter/LOW/AP1_0000.gxl')
