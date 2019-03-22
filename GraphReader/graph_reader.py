@@ -426,7 +426,7 @@ def aichemy_init_graph(prop, labels_id):
     g_B = prop['rot_const'][1]
     g_C = prop['rot_const'][2]
     g_mu = np.linalg.norm(prop['dipole'])
-    g_alpha = np.trace(prop['polarizability'] / 3.0)
+    g_alpha = np.trace(prop['polarizability']) / 3.0
     g_homo = prop['HOMO']
     g_lumo = prop['LUMO']
     g_gap = prop['LUMO'] - prop['HOMO']
@@ -526,7 +526,10 @@ def aichemy_graph_reader(graph_file, labels_id=None):
 
     g, l = aichemy_init_graph(data['properties'], labels_id)
 
-    atom_properties = data['dft']['grad_geomeTRIC']['geom']
+    atom_properties = data['dft']['grad_geomeTRIC']['geom'][-1] \
+            if len(data['dft']['grad_berny']['converged']) == 0\
+            else data['dft']['grad_berny']['geom'][-1]
+
     pc = data['properties']['mulliken_charge']
     smiles = data['smi']
     m = Chem.MolFromSmiles(smiles)

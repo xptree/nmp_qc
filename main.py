@@ -49,6 +49,7 @@ parser.add_argument('--labels', '-l', type=str,
                     'predicting all properties at once')
 parser.add_argument('--dataset', default='qm9', help='QM9')
 parser.add_argument('--datasetPath', default='./data/qm9/dsgdb9nsd/', help='dataset path')
+parser.add_argument('--aichemy-path', default="", type=str, help='aichemy dataset path')
 parser.add_argument('--logPath', default='./log/qm9/mpnn/', help='log path')
 parser.add_argument('--plotLr', default=False, help='allow plotting the data')
 parser.add_argument('--plotPath', default='./plot/qm9/mpnn/', help='plot path')
@@ -124,7 +125,15 @@ def main():
     data_valid = datasets.Qm9(root, valid_ids,
             edge_transform=utils.qm9_edges, e_representation='raw_distance',
             labels=args.labels)
+
     data_test = datasets.Qm9(root, test_ids,
+            edge_transform=utils.qm9_edges, e_representation='raw_distance',
+            labels=args.labels)
+
+    if len(args.aichemy_path):
+        aichemy_files = [f for f in os.listdir(args.aichemy_path) \
+                if os.path.isfile(os.path.join(args.aichemy_path, f)) and f.find("swp") == -1]
+        aichemy_data = datasets.AIChemy(args.aichemy_path, aichemy_files,
             edge_transform=utils.qm9_edges, e_representation='raw_distance',
             labels=args.labels)
 
@@ -146,6 +155,11 @@ def main():
     data_test.set_target_transform(lambda x: datasets.utils.normalize_data(x, stat_dict['target_mean'],
                                                                            stat_dict['target_std']))
 
+    if len(args.aichemy_path):
+        args.epochs = 0
+        aichemy_data.set_target_transform(lambda x: datasets.utils.normalize_data(x,stat_dict['target_mean'],
+                                                                           stat_dict['target_std']))
+
     # Data Loader
     train_loader = torch.utils.data.DataLoader(data_train,
                                                batch_size=args.batch_size, shuffle=True,
@@ -158,6 +172,10 @@ def main():
                                               batch_size=args.batch_size, collate_fn=datasets.utils.collate_g,
                                               num_workers=args.prefetch, pin_memory=True)
 
+    if len(args.aichemy_path):
+        aichemy_loader = torch.utils.data.DataLoader(aichemy_data,
+                                              batch_size=args.batch_size, collate_fn=datasets.utils.collate_g,
+                                              num_workers=args.prefetch, pin_memory=True)
     print('\tCreate model')
     in_n = [len(h_t[0]), len(list(e.values())[0])]
     hidden_state_size = 73
@@ -191,7 +209,8 @@ def main():
     print('Logger')
     logger = Logger(args.logPath)
 
-    lr_step = (args.lr-args.lr*args.lr_decay)/(args.epochs*args.schedule[1] - args.epochs*args.schedule[0])
+    lr_step = (args.lr-args.lr*args.lr_decay)/(args.epochs*args.schedule[1] - args.epochs*args.schedule[0]) \
+            if args.epochs > 0 else args.lr
 
     # get the best checkpoint if available without training
     if len(args.resume):
@@ -243,7 +262,7 @@ def main():
         logger.log_value('learning_rate', args.lr).step()
 
     # get the best checkpoint and test it with test set
-    if args.resume:
+    if args.resume and args.epochs:
         checkpoint_dir = args.resume
         best_model_file = os.path.join(checkpoint_dir, 'model_best.pth')
         if not os.path.isdir(checkpoint_dir):
@@ -262,8 +281,9 @@ def main():
             print("=> no best model found at '{}'".format(best_model_file))
 
     # For testing
-    validate(test_loader, model, criterion, evaluation)
-
+    er_test = validate(test_loader, model, criterion, evaluation)
+    er_aichemy = validate(aichemy_loader, model, criterion, evaluation)
+    print("test:", er_test * stat_dict['target_std'], "aichemy_test", er_aichemy * stat_dict['target_std'])
 
 def train(train_loader, model, criterion, optimizer, epoch, evaluation, logger):
     batch_time = AverageMeter()
