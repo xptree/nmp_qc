@@ -426,13 +426,13 @@ def aichemy_init_graph(prop, labels_id):
     g_B = prop['rot_const'][1]
     g_C = prop['rot_const'][2]
     g_mu = np.linalg.norm(prop['dipole'])
-    g_alpha = np.trace(prop['polarizability'])
+    g_alpha = np.trace(prop['polarizability'] / 3.0)
     g_homo = prop['HOMO']
     g_lumo = prop['LUMO']
     g_gap = prop['LUMO'] - prop['HOMO']
     g_r2 = prop['r2']
     g_zpve = prop['ZPVE']
-    g_U0 = prop['U0']
+    g_U0 = prop['U0'] + prop['ZPVE'] # to align to QM9, QM9's U0 is with ZPVE correction
     g_U = prop['U']
     g_H = prop['H']
     g_G = prop['G']
